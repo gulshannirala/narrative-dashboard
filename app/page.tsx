@@ -1,4 +1,5 @@
 "use client";
+
 import React, { useEffect, useMemo, useState } from "react";
 
 const SHEET_ID = "1hl93Th-1xGT3JTsMrGf6cGk-ZNPdxpfyHayGk5oP-ow";
@@ -12,10 +13,36 @@ const SAMPLE_CSV = `Year,Month,Narrative,Property,Posted,Reach,Engagement,Amount
 2026,April,Women Welfare,Facebook Pages,10,210000,18000,22000,3
 2026,April,Infrastructure Push,Instagram Handles,9,340000,22000,42000,4`;
 
-function parseCSV(text) {
-  const rows = [];
+type RowData = Record<string, string>;
+
+type Fields = {
+  year: string;
+  month: string;
+  narrative: string;
+  property: string;
+  posted: string;
+  reach: string;
+  engagement: string;
+  amountSpent: string;
+  influencers: string;
+};
+
+type Totals = {
+  posted: number;
+  reach: number;
+  engagement: number;
+  amountSpent: number;
+  influencers: number;
+};
+
+type PropertyData = Totals & {
+  name: string;
+};
+
+function parseCSV(text: string): string[][] {
+  const rows: string[][] = [];
   let current = "";
-  let row = [];
+  let row: string[] = [];
   let quoted = false;
 
   for (let i = 0; i < text.length; i += 1) {
@@ -51,11 +78,11 @@ function parseCSV(text) {
   return rows.filter((r) => r.some((cell) => cell !== ""));
 }
 
-function normaliseHeader(value) {
+function normaliseHeader(value: string): string {
   return String(value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
-function toNumber(value) {
+function toNumber(value: string | number | null | undefined): number {
   if (value === null || value === undefined || value === "") return 0;
   const clean = String(value).replace(/[₹,%\s,]/g, "").toLowerCase();
   if (clean.endsWith("cr")) return parseFloat(clean) * 10000000 || 0;
@@ -65,7 +92,7 @@ function toNumber(value) {
   return parseFloat(clean) || 0;
 }
 
-function formatNumber(value) {
+function formatNumber(value: number): string {
   const number = Number(value) || 0;
   if (number >= 10000000) return `${(number / 10000000).toFixed(2)}Cr`;
   if (number >= 100000) return `${(number / 100000).toFixed(2)}L`;
@@ -73,13 +100,13 @@ function formatNumber(value) {
   return Math.round(number).toLocaleString("en-IN");
 }
 
-function formatCurrency(value) {
+function formatCurrency(value: number): string {
   const number = Number(value) || 0;
   if (!number) return "₹0";
   return `₹${Math.round(number).toLocaleString("en-IN")}`;
 }
 
-function detectField(headers, candidates) {
+function detectField(headers: string[], candidates: string[]): string {
   const prepared = headers.map((header) => ({ original: header, key: normaliseHeader(header) }));
 
   for (const candidate of candidates) {
@@ -97,14 +124,14 @@ function detectField(headers, candidates) {
   return "";
 }
 
-function csvToObjects(csv) {
+function csvToObjects(csv: string): { headers: string[]; data: RowData[] } {
   const parsed = parseCSV(csv);
   const headers = parsed[0] || [];
-  const data = parsed.slice(1).map((row) => Object.fromEntries(headers.map((header, index) => [header, row[index] || ""])));
+  const data = parsed.slice(1).map((row) => Object.fromEntries(headers.map((header, index) => [header, row[index] || ""])) as RowData);
   return { headers, data };
 }
 
-function detectFields(headers) {
+function detectFields(headers: string[]): Fields {
   return {
     year: detectField(headers, ["Year"]),
     month: detectField(headers, ["Month"]),
@@ -118,17 +145,17 @@ function detectFields(headers) {
   };
 }
 
-function getCell(row, field, fallback = "") {
+function getCell(row: RowData, field: string, fallback = ""): string {
   if (!field || !row) return fallback;
   return row[field] || fallback;
 }
 
-function uniqueValues(rows, field) {
+function uniqueValues(rows: RowData[], field: string): string[] {
   if (!field) return [];
   return [...new Set(rows.map((row) => row[field]).filter(Boolean))].sort((a, b) => String(a).localeCompare(String(b), undefined, { numeric: true }));
 }
 
-function runTests() {
+function runTests(): void {
   const parsed = parseCSV('Name,Value,Caption\n"A, B",1.2K,"Quoted ""text"""');
   console.assert(parsed.length === 2, "CSV rows parsed");
   console.assert(parsed[1][0] === "A, B", "Quoted comma parsed");
@@ -143,8 +170,8 @@ function runTests() {
   console.assert(detectField(["Amount Spent", "Post Link"], ["Spend", "Amount Spent"]) === "Amount Spent", "Spend field detected");
 }
 
-function Icon({ type }) {
-  const paths = {
+function Icon({ type }: { type: keyof Totals | "amount" }): React.ReactElement {
+  const paths: Record<string, string> = {
     posted: "M5 4h10l4 4v12H5z M15 4v4h4 M8 13h8 M8 17h6",
     reach: "M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z M12 9a3 3 0 100 6 3 3 0 000-6z",
     engagement: "M7 11v8 M12 7v12 M17 13v6 M4 19h16",
@@ -161,11 +188,11 @@ function Icon({ type }) {
   );
 }
 
-function Card({ children, className = "" }) {
+function Card({ children, className = "" }: { children: React.ReactNode; className?: string }): React.ReactElement {
   return <div className={`rounded-3xl border border-slate-200 bg-white shadow-sm ${className}`}>{children}</div>;
 }
 
-function MetricCard({ icon, label, value }) {
+function MetricCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }): React.ReactElement {
   return (
     <Card className="p-5">
       <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-2xl bg-orange-100 text-orange-700">{icon}</div>
@@ -175,7 +202,7 @@ function MetricCard({ icon, label, value }) {
   );
 }
 
-function NativeSelect({ label, value, onChange, options, placeholder, disabled }) {
+function NativeSelect({ label, value, onChange, options, placeholder, disabled }: { label: string; value: string; onChange: (value: string) => void; options: string[]; placeholder: string; disabled: boolean }): React.ReactElement {
   return (
     <div>
       <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</label>
@@ -189,7 +216,7 @@ function NativeSelect({ label, value, onChange, options, placeholder, disabled }
   );
 }
 
-function ProgressRow({ label, value, max, formatter }) {
+function ProgressRow({ label, value, max, formatter }: { label: string; value: number; max: number; formatter: (value: number) => string }): React.ReactElement {
   const width = max ? Math.max(4, (value / max) * 100) : 0;
   return (
     <div>
@@ -204,7 +231,7 @@ function ProgressRow({ label, value, max, formatter }) {
   );
 }
 
-function EmptyState({ title, text }) {
+function EmptyState({ title, text }: { title: string; text: string }): React.ReactElement {
   return (
     <Card className="p-8 text-center">
       <p className="text-base font-bold text-slate-900">{title}</p>
@@ -213,9 +240,9 @@ function EmptyState({ title, text }) {
   );
 }
 
-export default function NarrativePerformanceDashboard() {
-  const [rows, setRows] = useState([]);
-  const [fields, setFields] = useState({});
+export default function NarrativePerformanceDashboard(): React.ReactElement {
+  const [rows, setRows] = useState<RowData[]>([]);
+  const [fields, setFields] = useState<Fields>({ year: "", month: "", narrative: "", property: "", posted: "", reach: "", engagement: "", amountSpent: "", influencers: "" });
   const [selectedYear, setSelectedYear] = useState("");
   const [selectedMonth, setSelectedMonth] = useState("");
   const [selectedNarrative, setSelectedNarrative] = useState("");
@@ -226,7 +253,7 @@ export default function NarrativePerformanceDashboard() {
   useEffect(() => {
     runTests();
 
-    async function loadData() {
+    async function loadData(): Promise<void> {
       try {
         const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(SHEET_NAME)}`;
         const response = await fetch(url);
@@ -238,7 +265,7 @@ export default function NarrativePerformanceDashboard() {
         setRows(data);
         setSourceLabel("Google Sheet");
         setNotice("");
-      } catch (error) {
+      } catch {
         const { headers, data } = csvToObjects(SAMPLE_CSV);
         setFields(detectFields(headers));
         setRows(data);
@@ -269,7 +296,7 @@ export default function NarrativePerformanceDashboard() {
     return rows.filter((row) => getCell(row, fields.year) === selectedYear && getCell(row, fields.month) === selectedMonth && getCell(row, fields.narrative) === selectedNarrative);
   }, [rows, fields, selectedYear, selectedMonth, selectedNarrative]);
 
-  const totals = useMemo(() => selectedRows.reduce((acc, row) => {
+  const totals = useMemo<Totals>(() => selectedRows.reduce((acc, row) => {
     acc.posted += toNumber(getCell(row, fields.posted));
     acc.reach += toNumber(getCell(row, fields.reach));
     acc.engagement += toNumber(getCell(row, fields.engagement));
@@ -278,12 +305,13 @@ export default function NarrativePerformanceDashboard() {
     return acc;
   }, { posted: 0, reach: 0, engagement: 0, amountSpent: 0, influencers: 0 }), [selectedRows, fields]);
 
-  const propertyData = useMemo(() => {
-    const map = new Map();
+  const propertyData = useMemo<PropertyData[]>(() => {
+    const map = new Map<string, PropertyData>();
     selectedRows.forEach((row) => {
       const name = getCell(row, fields.property, "Uncategorised Property");
       if (!map.has(name)) map.set(name, { name, posted: 0, reach: 0, engagement: 0, amountSpent: 0, influencers: 0 });
       const item = map.get(name);
+      if (!item) return;
       item.posted += toNumber(getCell(row, fields.posted));
       item.reach += toNumber(getCell(row, fields.reach));
       item.engagement += toNumber(getCell(row, fields.engagement));
@@ -293,18 +321,18 @@ export default function NarrativePerformanceDashboard() {
     return [...map.values()].sort((a, b) => b.reach - a.reach);
   }, [selectedRows, fields]);
 
-  function resetYear(value) {
+  function resetYear(value: string): void {
     setSelectedYear(value);
     setSelectedMonth("");
     setSelectedNarrative("");
   }
 
-  function resetMonth(value) {
+  function resetMonth(value: string): void {
     setSelectedMonth(value);
     setSelectedNarrative("");
   }
 
-  const showData = selectedYear && selectedMonth && selectedNarrative;
+  const showData = Boolean(selectedYear && selectedMonth && selectedNarrative);
   const maxReach = Math.max(...propertyData.map((item) => item.reach), 1);
   const maxEngagement = Math.max(...propertyData.map((item) => item.engagement), 1);
   const maxAmount = Math.max(...propertyData.map((item) => item.amountSpent), 1);
@@ -389,7 +417,7 @@ export default function NarrativePerformanceDashboard() {
                         <td>{formatNumber(item.influencers)}</td>
                       </tr>
                     ))}
-                    {!propertyData.length && <tr><td colSpan="6" className="py-10 text-center text-slate-500">No data available for this narrative.</td></tr>}
+                    {!propertyData.length && <tr><td colSpan={6} className="py-10 text-center text-slate-500">No data available for this narrative.</td></tr>}
                   </tbody>
                 </table>
               </div>
